@@ -9,7 +9,7 @@ class Layout:
         [sg.Text("Choose a File: "), sg.Input(key="-IN2-" ,change_submits=True), sg.FileBrowse(key="-FILE-", file_types=(("Excel Files", "*.xlsx"),("Excel Files", "*.xls"),("CSV Files", "*.csv")))],
         [sg.Button("Submit")],
         [sg.T("")],
-        [sg.Text("Progress: "), sg.ProgressBar(max_value=2, orientation='h', size=(30,20), key="-PROG-",bar_color="gray")],
+        [sg.Text("Progress: "), sg.ProgressBar(max_value=1000, orientation='h', size=(30,20), key="-PROG-",bar_color="gray")],
         [sg.Output(key='-OUT1-', size=(100, 8))],
         [sg.Button("Exit",size=(8,1),button_color=('red','white'))]]          
 

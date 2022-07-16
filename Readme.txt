@@ -30,3 +30,9 @@ Changing scrapping tipRanks to seeking alpha alone.
 	Technical score: 15%	
 
 ---------------------------------
+
+-------------V4------------------
+
+-MultyThreading programm for more fluid app running
+
+---------------------------------
