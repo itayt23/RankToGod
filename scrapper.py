@@ -99,7 +99,7 @@ class ClientsScraper:
 
 
     def sa_value_scrapper(self,symbol,index):
-        sa_api = os.getenv('sa_new_api_key')
+        sa_api = os.getenv('sa_api_key')
         url = "https://seeking-alpha.p.rapidapi.com/symbols/get-metrics"
         querystring = {"symbols":f"{symbol}","fields":"eps_ltg"}
 
