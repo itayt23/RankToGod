@@ -20,7 +20,7 @@ import pprint
 
 fundamental_score = 0
 first_blocked = 0
-secret = True
+secret = False
 if(secret):
     saw_name = 'S1'
     saa_name = 'S2'
@@ -43,10 +43,10 @@ class ClientsScraper:
         self.scrap_type = stock_interval
         if(stock_interval == 'Sentiment Rank'):
             self.stocks_df = pd.DataFrame(columns=['Symbol',saw_name,saa_name,saq_name,zacks_name,p123_name,guru_name,'Technical Score',
-                            'RankToGod Score',tipranks_name,'AI','Final Score','Sector','Industry','Market Cap','P/E','Forward P/E','Volatility (Month)','Beta'])
+                            'RankToGod Score',tipranks_name,'AI','Final Score','Sector','Industry','Market Cap','P/E','Forward P/E','Volatility (Month)','Beta','Earnings'])
         elif(stock_interval == 'Valuations'):
             self.stocks_df = pd.DataFrame(columns=['Symbol','P/E','Forward P/E','Beta','WACC %(TTM)','Buyback Yield %(TTM)','Dividend %','Shs Outstand','EPS (ttm)','Basic Eps TTM'
-                            ,'Consensus EPS Estimates','EPS next Y','EPS next 5Y','EPS FWD Long Term Growth','LT Debt/Eq','Sector','Industry','Market Cap','Volatility (Month)'])
+                            ,'Consensus EPS Estimates','EPS next Y','EPS next 5Y','EPS FWD Long Term Growth','LT Debt/Eq','Sector','Industry','Market Cap','Volatility (Month)','Earnings'])
         self.read_file(file_path, stock_interval)
         load_dotenv()
 
@@ -93,18 +93,18 @@ class ClientsScraper:
             self.stocks_df.loc[index, 'Forward P/E'] = fin_info['Forward P/E']
             self.stocks_df.loc[index, 'Volatility (Month)'] = fin_info['Volatility M']
             self.stocks_df.loc[index, 'Beta'] = fin_info['Beta']
+            self.stocks_df.loc[index, 'Earnings'] = fin_info['Earnings']
         except Exception as e:
             print('Problem with Finviz Scrapping '+str(e))
     
 
 
     def sa_value_scrapper(self,symbol,index):
-        sa_api = os.getenv('sa_api_key')
         url = "https://seeking-alpha.p.rapidapi.com/symbols/get-metrics"
         querystring = {"symbols":f"{symbol}","fields":"eps_ltg"}
 
         headers = {
-            "X-RapidAPI-Key": f"{sa_api}",
+            "X-RapidAPI-Key": os.getenv('sa_api_key'),
             "X-RapidAPI-Host": "seeking-alpha.p.rapidapi.com"}
 
         response = requests.get(url, headers=headers, params=querystring).json()
@@ -145,6 +145,7 @@ class ClientsScraper:
             self.stocks_df.loc[index, 'EPS next Y'] = fin_info['EPS next Y']
             self.stocks_df.loc[index, 'EPS next 5Y'] = fin_info['EPS next 5Y']
             self.stocks_df.loc[index, 'LT Debt/Eq'] = fin_info['LT Debt/Eq']
+            self.stocks_df.loc[index, 'Earnings'] = fin_info['Earnings']
         except Exception as e:
             print('Problem with Finviz Scrapping '+str(e))
             
@@ -278,14 +279,14 @@ class ClientsScraper:
             fundamental_score += 0.25 * rank
             self.stocks_df.loc[index, p123_name] = rank
         except p123api.ClientException as e:
-            print('P123 problem:' + e)
+            print(f"P123 problem: {str(e)}, Ticker: {symbol}")
             self.stocks_df.loc[index, p123_name] = 3
             fundamental_score += 0.25 * 3
 
     def portfolio123_technical_scrapper(self, symbol, index):
         try:
             today = date.today()
-            client = p123api.Client(api_id='179', api_key= os.getenv('p123_api_key'))
+            client = p123api.Client(api_id='179', api_key=os.getenv('p123_api_key'))
             data_technical = client.rank_ranks(
                 {
                     "rankingSystem": "technical rank",
@@ -309,7 +310,7 @@ class ClientsScraper:
             #rank_technical = portfolio123_to_rank(rank_technical)
             self.stocks_df.loc[index, 'Technical Score'] = (rank_technical/20)
         except p123api.ClientException as e:
-            print('P123 problem: '+ e)
+            print(f"Technical P123 problem: {str(e)}, Ticker: {symbol}" )
             self.stocks_df.loc[index, 'Technical Score'] = 3
 
     def guru_scrapper(self, symbol, index):

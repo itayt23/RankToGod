@@ -18,7 +18,7 @@ class Layout:
         return self.layout_main
     
     def setWindow(self, layout):
-        main_window = sg.Window('Rank To God',layout, size=(900,450),element_justification='c')
+        main_window = sg.Window('Rank To God',layout, size=(830,425),element_justification='c')
         version_layout = [
                 sg.Text('', size=(85, 1)),  # empty space to push the text to the right
                 sg.Text("Version V2.1", font=("Comic Sans MS", 9), justification='right')
