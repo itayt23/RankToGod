@@ -1,4 +1,3 @@
-from typing import final
 import pandas as pd
 from bs4 import BeautifulSoup
 import requests
@@ -8,14 +7,11 @@ import pandas as pd
 from datetime import date
 import random
 import time
-import yfinance as yf
 import selenium.webdriver as webdriver
 from webdriver_manager.chrome import ChromeDriverManager
 from dotenv import load_dotenv
 import os
 from finvizfinance.quote import finvizfinance
-import pprint
-
 
 
 fundamental_score = 0
@@ -100,35 +96,38 @@ class ClientsScraper:
 
 
     def sa_value_scrapper(self,symbol,index):
-        url = "https://seeking-alpha.p.rapidapi.com/symbols/get-metrics"
-        querystring = {"symbols":f"{symbol}","fields":"eps_ltg"}
+        try:
+            url = "https://seeking-alpha.p.rapidapi.com/symbols/get-metrics"
+            querystring = {"symbols":f"{symbol}","fields":"eps_ltg"}
 
-        headers = {
-            "X-RapidAPI-Key": os.getenv('sa_api_key'),
-            "X-RapidAPI-Host": "seeking-alpha.p.rapidapi.com"}
+            headers = {
+                "X-RapidAPI-Key": os.getenv('sa_api_key'),
+                "X-RapidAPI-Host": "seeking-alpha.p.rapidapi.com"}
 
-        response = requests.get(url, headers=headers, params=querystring).json()
-        eps_long = response['data'][0]['attributes']['value']
-        eps_long = round(eps_long,2)
-        ticker_id = response['data'][0]['relationships']['ticker']['data']['id']
+            response = requests.get(url, headers=headers, params=querystring).json()
+            eps_long = response['data'][0]['attributes']['value']
+            eps_long = round(eps_long,2)
+            ticker_id = response['data'][0]['relationships']['ticker']['data']['id']
 
-        url = "https://seeking-alpha.p.rapidapi.com/symbols/get-earnings"
-        querystring = {f"ticker_ids":{ticker_id},"period_type":"annual","relative_periods":"0,1","estimates_data_items":"eps_normalized_consensus_mean"}
-        response = requests.get(url, headers=headers, params=querystring).json()
-        eps_consensus = round(float(response['estimates'][ticker_id]['eps_normalized_consensus_mean']['1'][0]['dataitemvalue']),2)
+            url = "https://seeking-alpha.p.rapidapi.com/symbols/get-earnings"
+            querystring = {f"ticker_ids":{ticker_id},"period_type":"annual","relative_periods":"0,1","estimates_data_items":"eps_normalized_consensus_mean"}
+            response = requests.get(url, headers=headers, params=querystring).json()
+            eps_consensus = round(float(response['estimates'][ticker_id]['eps_normalized_consensus_mean']['1'][0]['dataitemvalue']),2)
 
-        url = "https://seeking-alpha.p.rapidapi.com/symbols/get-financials"
-        querystring = {"symbol":"NVDA","target_currency":"USD","period_type":"annual","statement_type":"income-statement"}
-        response = requests.get(url, headers=headers, params=querystring).json()
-        if(response[4]['rows'][1]['value'] == 'Basic EPS'):
-            eps_val =  response[4]['rows'][2]['cells'][-1]['value']
-        else:
-            print("Could not succeed in obtaining Basic EPS TTM")
-            eps_val = 'N\A'
+            url = "https://seeking-alpha.p.rapidapi.com/symbols/get-financials"
+            querystring = {"symbol":"NVDA","target_currency":"USD","period_type":"annual","statement_type":"income-statement"}
+            response = requests.get(url, headers=headers, params=querystring).json()
+            if(response[4]['rows'][1]['value'] == 'Basic EPS'):
+                eps_val =  response[4]['rows'][2]['cells'][-1]['value']
+            else:
+                print("Could not succeed in obtaining Basic EPS TTM")
+                eps_val = 'N\A'
 
-        self.stocks_df.loc[index, 'EPS FWD Long Term Growth'] = eps_long
-        self.stocks_df.loc[index, 'Consensus EPS Estimates'] = eps_consensus
-        self.stocks_df.loc[index, 'Basic Eps TTM'] = eps_val
+            self.stocks_df.loc[index, 'EPS FWD Long Term Growth'] = eps_long
+            self.stocks_df.loc[index, 'Consensus EPS Estimates'] = eps_consensus
+            self.stocks_df.loc[index, 'Basic Eps TTM'] = eps_val
+        except Exception as e:
+            print('Problem with Seeking alpha Scrapping '+str(e))
 
     def finviz_value_scrapper(self,symbol,index):
         try:

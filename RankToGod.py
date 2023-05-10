@@ -1,7 +1,4 @@
-from sre_constants import SUCCESS
-from PySimpleGUI.PySimpleGUI import WINDOW_CLOSE_ATTEMPTED_EVENT
 from scrapper import ClientsScraper
-from datetime import date
 import time
 from window import Layout
 import PySimpleGUI as sg
