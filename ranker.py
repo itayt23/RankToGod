@@ -11,9 +11,22 @@ import selenium.webdriver as webdriver
 from webdriver_manager.chrome import ChromeDriverManager
 from dotenv import load_dotenv
 import os
-from finvizfinance.quote import finvizfinance
+import finvizfinance.quote as finviz
+import chart_to_god
+import numpy as np
 
 
+# fin_info = finviz.finvizfinance(symbol)
+# fin_info = fin_info.ticker_fundament()
+# self.stocks_df.loc[index, 'Market Cap'] = fin_info['Market Cap']
+# self.stocks_df.loc[index, 'P/E'] = fin_info['P/E']
+# self.stocks_df.loc[index, 'Forward P/E'] = fin_info['Forward P/E']
+# self.stocks_df.loc[index, 'Volatility (Month)'] = fin_info['Volatility M']
+# self.stocks_df.loc[index, 'Beta'] = fin_info['Beta']
+# self.stocks_df.loc[index, 'Earnings'] = fin_info['Earnings']
+
+rank_to_god_score_weight = 0.14285714
+final_score_weight = 0.1111
 fundamental_score = 0
 first_blocked = 0
 secret = False
@@ -34,37 +47,44 @@ else:
     guru_name = 'GuruFocus'
     tipranks_name = 'TipRanks'
 
-class ClientsScraper:
+class Ranker:
     def __init__(self, file_path, stock_interval):
         self.scrap_type = stock_interval
-        if(stock_interval == 'Sentiment Rank'):
+        self.technical_score = 0
+        if(stock_interval == 'RankToGod Analysis'):
             self.stocks_df = pd.DataFrame(columns=['Symbol',saw_name,saa_name,saq_name,zacks_name,p123_name,guru_name,'Technical Score',
-                            'RankToGod Score',tipranks_name,'AI','Final Score','Sector','Industry','Market Cap','P/E','Forward P/E','Volatility (Month)','Beta','Earnings'])
+                            'RankToGod Score',tipranks_name,'AI','Final Score','Sector','Industry','Market Cap','P/E','Forward P/E','Beta','Earnings'])
         elif(stock_interval == 'Valuations'):
-            self.stocks_df = pd.DataFrame(columns=['Symbol','P/E','Forward P/E','Beta','WACC %(TTM)','Buyback Yield %(TTM)','Dividend %','Shs Outstand','EPS (ttm)','Basic Eps TTM'
-                            ,'Consensus EPS Estimates','EPS next Y','EPS next 5Y','EPS FWD Long Term Growth','LT Debt/Eq','Sector','Industry','Market Cap','Volatility (Month)','Earnings'])
+            self.stocks_df = pd.DataFrame(columns=['Symbol','P/E','Forward P/E','Beta','WACC %(TTM)','Buyback Yield %(TTM)','Dividend %','Shs Outstand','Basic Eps TTM'
+                            ,'Consensus EPS Estimates','Sector','Industry','Market Cap','Earnings','Purchase Of Property, Plant, Equipment TTM'
+                            ,'Purchase Of Property, Plant, Equipment AVG3Y'])
         self.read_file(file_path, stock_interval)
         load_dotenv()
 
-    def get_scrap_type(self):
+    def get_rank_type(self):
         return self.scrap_type
 
     def getDataFrame(self):
         return self.stocks_df
     
+    def run_technical(self,symbol,index):
+        score = chart_to_god.run_technical(symbol,index)
+        self.technical_score = score
+        self.stocks_df.loc[index, 'Technical Score'] = score
+        
 
-    def scrap(self, symbol, index):
-        if(self.scrap_type == 'Sentiment Rank'):
-            self.scrap_sentiment_rank(symbol,index)
-        elif(self.scrap_type == 'Valuations'):
-            self.scrap_valuations(symbol,index)
+    # def run_sentiment(self, symbol, index):
+    #     if(self.scrap_type == 'Sentiment Rank'):
+    #         self.run_sentiment_rank(symbol,index)
+    #     elif(self.scrap_type == 'Valuations'):
+    #         self.run_valuations(symbol,index)
 
-    def scrap_valuations(self, symbol, index):
-        self.sa_value_scrapper(symbol,index)
+    def run_valuations(self, symbol, index):
         self.guru_value_scrapper(symbol,index)
-        self.finviz_value_scrapper(symbol,index)
+        self.sa_value_scrapper(symbol,index)
+        # self.finviz_value_scrapper(symbol,index)
     
-    def scrap_sentiment_rank(self, symbol, index):
+    def run_sentiment_rank(self, symbol, index):
         global fundamental_score
         fundamental_score = 0
         symbol = str(symbol)
@@ -74,28 +94,55 @@ class ClientsScraper:
         self.alpha_scrapper_api(symbol, index)
         self.zacks_scrapper(symbol, index)
         self.portfolio123_scrapper(symbol, index)
-        self.portfolio123_technical_scrapper(symbol, index)
+        # self.portfolio123_technical_scrapper(symbol, index)
         self.guru_scrapper(symbol,index)
-        self.stocks_df.loc[index, 'RankToGod Score'] =f"={fundamental_score}+0.15*I{index+2}"
-        self.stocks_df.loc[index, 'Final Score'] =f"=0.78*J{index+2} + 0.11*K{index+2} + 0.11*L{index+2}"
-        sector,industry = self.getSectorAndInd(symbol)
-        self.stocks_df.loc[index, 'Sector'] = sector
-        self.stocks_df.loc[index, 'Industry'] = industry
+        self.stocks_df.loc[index, 'RankToGod Score'] =f"={fundamental_score}+0.14285714*(I{index+2}*5)"
+        self.stocks_df.loc[index, 'Final Score'] =f"=0.7777*J{index+2} + 0.1111*K{index+2} + 0.1111*L{index+2}"
+        api_key = os.getenv('guru_api_key')
         try:
-            fin_info = finvizfinance(symbol)
-            fin_info = fin_info.ticker_fundament()
-            self.stocks_df.loc[index, 'Market Cap'] = fin_info['Market Cap']
-            self.stocks_df.loc[index, 'P/E'] = fin_info['P/E']
-            self.stocks_df.loc[index, 'Forward P/E'] = fin_info['Forward P/E']
-            self.stocks_df.loc[index, 'Volatility (Month)'] = fin_info['Volatility M']
-            self.stocks_df.loc[index, 'Beta'] = fin_info['Beta']
-            self.stocks_df.loc[index, 'Earnings'] = fin_info['Earnings']
+            url = f"https://api.gurufocus.com/public/user/{api_key}/stock/{symbol}/financials"
+            response = requests.request("GET", url)
+            stock_info = response.json()
+            self.stocks_df.loc[index, 'P/E'] = stock_info['financials']['annuals']['valuation_ratios']['PE Ratio without NRI'][-1]
+            self.stocks_df.loc[index, 'Beta'] = stock_info['financials']['annuals']['valuation_and_quality']['Beta'][-1]
+            self.stocks_df.loc[index, 'Market Cap'] = stock_info['financials']['annuals']['valuation_and_quality']['Market Cap'][-1]
+            self.stocks_df.loc[index, 'Shs Outstand'] = stock_info['financials']['annuals']['income_statement']['Shares Outstanding (Diluted Average)'][-1]
+            self.stocks_df.loc[index, 'Dividend %'] = stock_info['financials']['annuals']['valuation_ratios']['Dividend Yield %'][-1]
         except Exception as e:
-            print('Problem with Finviz Scrapping '+str(e))
+            print('Problem with Guru Fundamental API '+str(e))
+        try:
+            url = f"https://api.gurufocus.com/public/user/{api_key}/stock/{symbol}/summary"
+            response = requests.request("GET", url)
+            stock_info = response.json()
+            self.stocks_df.loc[index, 'Sector'] = stock_info['summary']['general']['sector']
+            self.stocks_df.loc[index, 'Industry'] = stock_info['summary']['general']['industry']
+            self.stocks_df.loc[index, 'Earnings'] = stock_info['summary']['company_data']['next_earnings_date']
+            self.stocks_df.loc[index, 'Forward P/E'] = (stock_info['summary']['ratio']['Forward P/E']['value'])
+        except Exception as e:
+            print("Problem with Guru 'summary' Fundamental API "+str(e))
+            
+          
     
 
 
     def sa_value_scrapper(self,symbol,index):
+        try:
+            url = "https://seeking-alpha.p.rapidapi.com/symbols/get-metrics"
+            querystring = {"symbols":f"{symbol}","fields":"eps_ltg"}
+
+            headers = {
+                "X-RapidAPI-Key": os.getenv('sa_api_key'),
+                "X-RapidAPI-Host": "seeking-alpha.p.rapidapi.com"}
+
+            response = requests.get(url, headers=headers, params=querystring).json()
+            eps_long = response['data'][0]['attributes']['value']
+            eps_long = round(eps_long,2)
+            self.stocks_df.loc[index, 'EPS FWD Long Term Growth(SA)'] = eps_long
+        except Exception as e:
+            print('Problem with Seeking alpha Scrapping '+str(e))
+            self.stocks_df.loc[index, 'EPS FWD Long Term Growth(SA)'] = 'N/A'
+
+    def sa_value_scrapper_old(self,symbol,index):
         try:
             url = "https://seeking-alpha.p.rapidapi.com/symbols/get-metrics"
             querystring = {"symbols":f"{symbol}","fields":"eps_ltg"}
@@ -131,20 +178,20 @@ class ClientsScraper:
 
     def finviz_value_scrapper(self,symbol,index):
         try:
-            fin_info = finvizfinance(symbol)
+            fin_info = finviz.finvizfinance(symbol)
             fin_info = fin_info.ticker_fundament()
             self.stocks_df.loc[index, 'Beta'] = fin_info['Beta']
             self.stocks_df.loc[index, 'Market Cap'] = fin_info['Market Cap']
             self.stocks_df.loc[index, 'P/E'] = fin_info['P/E']
-            self.stocks_df.loc[index, 'Forward P/E'] = fin_info['Forward P/E']
-            self.stocks_df.loc[index, 'Volatility (Month)'] = fin_info['Volatility M']
             self.stocks_df.loc[index, 'Dividend %'] = fin_info['Dividend %']
             self.stocks_df.loc[index, 'Shs Outstand'] = fin_info['Shs Outstand']
+            self.stocks_df.loc[index, 'Forward P/E'] = fin_info['Forward P/E']
+            self.stocks_df.loc[index, 'Volatility (Month)'] = fin_info['Volatility M']
+            self.stocks_df.loc[index, 'LT Debt/Eq'] = fin_info['LT Debt/Eq']            
+            self.stocks_df.loc[index, 'Earnings'] = fin_info['Earnings']
             self.stocks_df.loc[index, 'EPS (ttm)'] = fin_info['EPS (ttm)']
             self.stocks_df.loc[index, 'EPS next Y'] = fin_info['EPS next Y']
             self.stocks_df.loc[index, 'EPS next 5Y'] = fin_info['EPS next 5Y']
-            self.stocks_df.loc[index, 'LT Debt/Eq'] = fin_info['LT Debt/Eq']
-            self.stocks_df.loc[index, 'Earnings'] = fin_info['Earnings']
         except Exception as e:
             print('Problem with Finviz Scrapping '+str(e))
             
@@ -161,8 +208,8 @@ class ClientsScraper:
             if browser.findAll('title').pop().string in 'Page Not Found :(':
                 self.stocks_df.loc[index, 'Tip score'] = 3
                 #self.stocks_df.loc[index, 'Tip analyst'] = 3
-                fundamental_score += 0.1 * 3
-                #fundamental_score += 0.1 * 3
+                fundamental_score += rank_to_god_score_weight * 3
+                #fundamental_score += rank_to_god_score_weight * 3
                 return
             while(blocked):
                 if browser.findAll('title').pop().string in {'Error Page','Security Violation (503)'}:
@@ -188,12 +235,12 @@ class ClientsScraper:
             smart_score = int(smart_score)/2
             self.stocks_df.loc[index, 'Tip score'] = smart_score
             #self.stocks_df.loc[index, 'Tip analyst'] = consensus_score
-            fundamental_score += 0.1 * smart_score
-            #fundamental_score += 0.1 * consensus_score
+            fundamental_score += rank_to_god_score_weight * smart_score
+            #fundamental_score += rank_to_god_score_weight * consensus_score
         except Exception as e:
             print('Problem with TipRanks WebSite: '+str(e))
             self.stocks_df.loc[index, 'Tip score'] = 3
-            fundamental_score += 0.1 * 3
+            fundamental_score += rank_to_god_score_weight * 3
 
     def alpha_scrapper_api(self, symbol, index):
         quant_rating = None
@@ -240,12 +287,12 @@ class ClientsScraper:
             rating = rating[1]
             rating = rating.strip(" ").replace('"',"")
             rating = 6 - int(rating)
-            fundamental_score +=  0.15 * rating
+            fundamental_score +=  rank_to_god_score_weight * rating
             self.stocks_df.loc[index, zacks_name] = rating
         except Exception as e:
             print('Problem with Zacks website: '+str(e))
             self.stocks_df.loc[index, zacks_name] = 3
-            fundamental_score += 0.15 * 3
+            fundamental_score += rank_to_god_score_weight * 3
 
     def portfolio123_scrapper(self, symbol, index):
         try:
@@ -270,22 +317,22 @@ class ClientsScraper:
             rank = str(data['ranks'])
             if(len(rank) == 2):
                 self.stocks_df.loc[index, p123_name] = 3
-                fundamental_score += 0.25 * 3
+                fundamental_score += rank_to_god_score_weight * 3
                 return
             rank = float(rank.replace("[","").replace("]",""))
             #rank = portfolio123_to_rank(rank)
             rank = rank/20
-            fundamental_score += 0.25 * rank
+            fundamental_score += rank_to_god_score_weight * rank
             self.stocks_df.loc[index, p123_name] = rank
         except p123api.ClientException as e:
             print(f"P123 problem: {str(e)}, Ticker: {symbol}")
             self.stocks_df.loc[index, p123_name] = 3
-            fundamental_score += 0.25 * 3
+            fundamental_score += rank_to_god_score_weight * 3
 
     def portfolio123_technical_scrapper(self, symbol, index):
         try:
             today = date.today()
-            client = p123api.Client(api_id='179', api_key=os.getenv('p123_api_key'))
+            client = p123api.Client(api_id='179', api_key= os.getenv('p123_api_key'))
             data_technical = client.rank_ranks(
                 {
                     "rankingSystem": "technical rank",
@@ -326,7 +373,7 @@ class ClientsScraper:
             gf_score = float(stock_info['summary']['general']['gf_score'])
             gf_score = (gf_score/20)
             self.stocks_df.loc[index, guru_name] = (gf_score)
-            fundamental_score += 0.1 * 3
+            fundamental_score += rank_to_god_score_weight * gf_score
            
         except Exception as e:
             info =""
@@ -334,22 +381,100 @@ class ClientsScraper:
                 info = stock_info["message"]
             print('Problem with GuruFoucus website: '+str(e) + ", API info: " +  info)
             self.stocks_df.loc[index, guru_name] = 3
-            fundamental_score += 0.1 * 3
+            fundamental_score += rank_to_god_score_weight * 3
+
 
     def guru_value_scrapper(self, symbol, index):
+        api_key = os.getenv('guru_api_key')
         try:
-            global fundamental_score,guru_name
-            api_key = os.getenv('guru_api_key')
             url = f"https://api.gurufocus.com/public/user/{api_key}/stock/{symbol}/financials"
             response = requests.request("GET", url)
             stock_info = response.json()
+            #stock_info['financials']['annuals'].keys() - dict_keys(['Fiscal Year', 'Preliminary', 'per_share_data_array', 'common_size_ratios', 
+            # 'income_statement', 'balance_sheet', 'cashflow_statement', 'valuation_ratios', 'valuation_and_quality'])
             wacc = stock_info['financials']['annuals']['common_size_ratios']['WACC %'][-1]
             buyback = stock_info['financials']['annuals']['valuation_and_quality']['Buyback Yield %'][-1]
+            basic_eps = stock_info['financials']['annuals']['income_statement']['EPS (Diluted)'][-1]
+            self.stocks_df.loc[index, 'P/E'] = stock_info['financials']['annuals']['valuation_ratios']['PE Ratio without NRI'][-1]
+            self.stocks_df.loc[index, 'Beta'] = stock_info['financials']['annuals']['valuation_and_quality']['Beta'][-1]
+            self.stocks_df.loc[index, 'Market Cap'] = stock_info['financials']['annuals']['valuation_and_quality']['Market Cap'][-1]
+            self.stocks_df.loc[index, 'Shs Outstand'] = stock_info['financials']['annuals']['income_statement']['Shares Outstanding (Diluted Average)'][-1]
+            self.stocks_df.loc[index, 'Dividend %'] = stock_info['financials']['annuals']['valuation_ratios']['Dividend Yield %'][-1]
+            basic_eps = stock_info['financials']['annuals']['per_share_data_array']['EPS without NRI'][-1]
             self.stocks_df.loc[index, 'WACC %(TTM)'] = wacc
             self.stocks_df.loc[index, 'Buyback Yield %(TTM)'] = buyback
-            sector,industry = self.getSectorAndInd(symbol)
-            self.stocks_df.loc[index, 'Sector'] = sector
-            self.stocks_df.loc[index, 'Industry'] = industry
+            self.stocks_df.loc[index, 'Basic Eps TTM'] = basic_eps
+            cash_flow_parchase_ttm = stock_info['financials']['annuals']['cashflow_statement']['Purchase Of Property, Plant, Equipment'][-1]
+            avg_3y_cash_flow_parchase = cal_avg( stock_info['financials']['annuals']['cashflow_statement']['Purchase Of Property, Plant, Equipment'],3)
+            self.stocks_df.loc[index, 'Purchase Of Property, Plant, Equipment TTM'] = cash_flow_parchase_ttm
+            self.stocks_df.loc[index, 'Purchase Of Property, Plant, Equipment AVG3Y'] = avg_3y_cash_flow_parchase
+            tax_rate_avg_5y = cal_avg( stock_info['financials']['annuals']['income_statement']['Tax Rate %'],5)
+            self.stocks_df.loc[index, 'Tax Rate % AVG5Y'] = tax_rate_avg_5y
+            pe_avg_10y = cal_avg( stock_info['financials']['annuals']['valuation_ratios']['PE Ratio without NRI'],10)
+            pe_high_10y,pe_low_10y = get_high_low( stock_info['financials']['annuals']['valuation_ratios']['PE Ratio without NRI'],10)
+            self.stocks_df.loc[index, 'PE AVG10Y'] = pe_avg_10y
+            self.stocks_df.loc[index, 'PE High 10Y'] = pe_high_10y
+            self.stocks_df.loc[index, 'PE Low 10Y'] = pe_low_10y
+            cash_from_operations_ttm = stock_info['financials']['annuals']['cashflow_statement']['Cash Flow from Operations'][-1]
+            cash_from_operation_avg_3y = cal_avg( stock_info['financials']['annuals']['cashflow_statement']['Cash Flow from Operations'],3)
+            self.stocks_df.loc[index, 'Cash Flow from Operations TTM'] = cash_from_operations_ttm
+            self.stocks_df.loc[index, 'Cash Flow from Operations AVG10Y'] = cash_from_operation_avg_3y
+            net_income_countinuing_operation_avg_10y = cal_avg( stock_info['financials']['annuals']['income_statement']['Net Income (Continuing Operations)'],10)
+            free_cash_flow_avg_10y = cal_avg( stock_info['financials']['annuals']['cashflow_statement']['Free Cash Flow'],10)
+            self.stocks_df.loc[index, 'FCF/NetInc'] = free_cash_flow_avg_10y /net_income_countinuing_operation_avg_10y
+            total_debt_per_share_ttm = float(stock_info['financials']['annuals']['per_share_data_array']['Total Debt per Share'][-1])
+            cash_per_share_ttm = float(stock_info['financials']['annuals']['per_share_data_array']['Cash per Share'][-1])
+            ebiddta_per_share_ttm = float(stock_info['financials']['annuals']['per_share_data_array']['EBITDA per Share'][-1])
+            self.stocks_df.loc[index, '(DebtPs-CashPs)/EBITDAPS'] = (total_debt_per_share_ttm - cash_per_share_ttm) /ebiddta_per_share_ttm 
+            self.stocks_df.loc[index, 'Debt/Eq'] = stock_info['financials']['annuals']['common_size_ratios']['Debt-to-Equity'][-1]
+           
+        except Exception as e:
+            info =""
+            if("message" in stock_info):
+                info = stock_info["message"]
+            print('Problem with GuruFoucus website: '+str(e) + ", API info: " +  info)
+
+        try:
+            url = f"https://api.gurufocus.com/public/user/{api_key}/stock/{symbol}/analyst_estimate"
+            response = requests.request("GET", url)
+            stock_info = response.json()
+            # dict_keys(['date', 'revenue_estimate', 'ebit_estimate', 'ebitda_estimate', 'dividend_estimate', 'per_share_eps_estimate',
+            #  'eps_nri_estimate', 'long_term_growth_rate_mean', 'long_term_revenue_growth_rate_mean'])
+            self.stocks_df.loc[index, 'Consensus EPS Estimates'] = stock_info['annual']['eps_nri_estimate'][0]
+           
+        except Exception as e:
+            info =""
+            if("message" in stock_info):
+                info = stock_info["message"]
+            print('Problem with GuruFoucus website: '+str(e) + ", API info: " +  info)
+        try:
+            url = f"https://api.gurufocus.com/public/user/{api_key}/stock/{symbol}/summary"
+            response = requests.request("GET", url)
+            stock_info = response.json()
+            # stock_info['summary'] - dict_keys(['general', 'chart', 'ratio', 'guru', 'insider', 'company_data', 'estimate'])
+            # print( stock_info['summary']['estimate'].keys()) dict_keys(['count', 'percentage', 'quarter', 'Revenue', 'per share eps', 'eps_nri', 'Dividends Per Share', 'LongTermGrowthRateMean', 'LongTermRevenueGrowthRateMean'])
+            future_eps_fwd = stock_info['summary']['ratio']['Future 3-5Y EPS without NRI Growth Rate']['value']
+            revenue_growth_1y = stock_info['summary']['company_data']['rvn_growth_1y']
+            revenue_growth_3y = stock_info['summary']['company_data']['rvn_growth_3y']
+            revenue_growth_5y = stock_info['summary']['company_data']['rvn_growth_5y']
+            revenue_growth_10y = stock_info['summary']['company_data']['rvn_growth_10y']
+            ebitda_growth_1y = stock_info['summary']['company_data']['ebitda_growth_1y']
+            ebitda_growth_3y = stock_info['summary']['company_data']['ebitda_growth_3y']
+            ebitda_growth_5y = stock_info['summary']['company_data']['ebitda_growth_5y']
+            ebitda_growth_10y = stock_info['summary']['company_data']['ebitda_growth_10y']
+            self.stocks_df.loc[index, 'Revenue Growth 1Y'] = revenue_growth_1y
+            self.stocks_df.loc[index, 'Revenue Growth 3Y'] = revenue_growth_3y
+            self.stocks_df.loc[index, 'Revenue Growth 5Y'] = revenue_growth_5y
+            self.stocks_df.loc[index, 'Revenue Growth 10Y'] = revenue_growth_10y
+            self.stocks_df.loc[index, 'EBITDA Growth 1Y'] = ebitda_growth_1y
+            self.stocks_df.loc[index, 'EBITDA Growth 3Y'] = ebitda_growth_3y
+            self.stocks_df.loc[index, 'EBITDA Growth 5Y'] = ebitda_growth_5y
+            self.stocks_df.loc[index, 'EBITDA Growth 10Y'] = ebitda_growth_10y
+            self.stocks_df.loc[index, 'Sector'] = stock_info['summary']['general']['sector']
+            self.stocks_df.loc[index, 'Industry'] = stock_info['summary']['general']['industry']
+            self.stocks_df.loc[index, 'Earnings'] = stock_info['summary']['company_data']['next_earnings_date']
+            self.stocks_df.loc[index, 'Forward P/E'] = (stock_info['summary']['ratio']['Forward P/E']['value'])
+            self.stocks_df.loc[index, 'Future 3-5Y EPS'] = future_eps_fwd 
            
         except Exception as e:
             info =""
@@ -368,36 +493,6 @@ class ClientsScraper:
         if rank >= 90: return 5
         if rank <=20: return 1 #check it with itay
         return rank/20
-    
-    def getSectorAndInd(self,symbol):
-        try:
-            api_key = os.getenv('guru_api_key')
-            url = f"https://api.gurufocus.com/public/user/{api_key}/stock/{symbol}/summary"
-            response = requests.request("GET", url)
-            stock_info = response.json()
-            return stock_info['summary']['general']['sector'],stock_info['summary']['general']['industry']
-        except:
-            sector = 'None'
-            ind = 'None'
-        return sector, ind
-
-    def getIndustry(self,symbol):
-        try:
-            api_key = os.getenv('guru_api_key')
-            url = f"https://api.gurufocus.com/public/user/{api_key}/stock/{symbol}/summary"
-            response = requests.request("GET", url)
-            stock_info = response.json()
-            return stock_info['summary']['general']['industry']
-            # stock_info = investpy.stocks.get_stock_information(symbol=symbol)
-            # industry = stock_info['Industries'].iloc[0]
-            # ticker_data = yf.Ticker(symbol)
-            # industry = ticker_data.info['industry']
-            # data_source = 'yahoo'
-            # stock_info = web.get_quote_yahoo(symbol, data_source=data_source)
-            # industry = stock_info['industry'][0]
-        except:
-            industry = 'None'
-        return industry
 
     def sa_score_handle(self, sa_authors_rating, quant_rating, sa_wall_street, sa_authors_flag, sa_quant_flag, sa_wall_flag, index):
         global fundamental_score,saw_name,saa_name,saq_name
@@ -405,58 +500,58 @@ class ClientsScraper:
                 self.stocks_df.loc[index, saa_name] = sa_authors_rating
                 self.stocks_df.loc[index, saq_name] = quant_rating
                 self.stocks_df.loc[index, saw_name] = sa_wall_street
-                fundamental_score += 0.1 * sa_authors_rating
-                fundamental_score += 0.15 * quant_rating
-                fundamental_score += 0.1 * sa_wall_street
+                fundamental_score += rank_to_god_score_weight * sa_authors_rating
+                fundamental_score += rank_to_god_score_weight * quant_rating
+                fundamental_score += rank_to_god_score_weight * sa_wall_street
         elif sa_authors_flag == False and sa_quant_flag == False and sa_wall_flag == True: 
                 self.stocks_df.loc[index, saa_name] = sa_authors_rating
                 self.stocks_df.loc[index, saq_name] = quant_rating
                 self.stocks_df.loc[index, saw_name] = 3
-                fundamental_score += 0.1 * sa_authors_rating
-                fundamental_score += 0.15 * quant_rating
-                fundamental_score += 0.1 * 3
+                fundamental_score += rank_to_god_score_weight * sa_authors_rating
+                fundamental_score += rank_to_god_score_weight * quant_rating
+                fundamental_score += rank_to_god_score_weight * 3
         elif sa_authors_flag == False and sa_quant_flag == True and sa_wall_flag == False: 
                 self.stocks_df.loc[index, saa_name] = sa_authors_rating
                 self.stocks_df.loc[index, saq_name] = 3
                 self.stocks_df.loc[index, saw_name] = sa_wall_street
-                fundamental_score += 0.1 * sa_authors_rating
-                fundamental_score += 0.15 * 3
-                fundamental_score += 0.1 * sa_wall_street
+                fundamental_score += rank_to_god_score_weight * sa_authors_rating
+                fundamental_score += rank_to_god_score_weight * 3
+                fundamental_score += rank_to_god_score_weight * sa_wall_street
         elif sa_authors_flag == False and sa_quant_flag == True and sa_wall_flag == True: 
                 self.stocks_df.loc[index, saa_name] = sa_authors_rating
                 self.stocks_df.loc[index, saq_name] = 3
                 self.stocks_df.loc[index, saw_name] = 3
-                fundamental_score += 0.1 * sa_authors_rating
-                fundamental_score += 0.15 * 3
-                fundamental_score += 0.1 * 3
+                fundamental_score += rank_to_god_score_weight * sa_authors_rating
+                fundamental_score += rank_to_god_score_weight * 3
+                fundamental_score += rank_to_god_score_weight * 3
         elif sa_authors_flag == True and sa_quant_flag == False and sa_wall_flag == False: 
                 self.stocks_df.loc[index, saa_name] = 3
                 self.stocks_df.loc[index, saq_name] = quant_rating
                 self.stocks_df.loc[index, saw_name] = sa_wall_street
-                fundamental_score += 0.1 * 3
-                fundamental_score += 0.15 * quant_rating
-                fundamental_score += 0.1 * sa_wall_street
+                fundamental_score += rank_to_god_score_weight * 3
+                fundamental_score += rank_to_god_score_weight * quant_rating
+                fundamental_score += rank_to_god_score_weight * sa_wall_street
         elif sa_authors_flag == True and sa_quant_flag == False and sa_wall_flag == True: 
                 self.stocks_df.loc[index, saa_name] = 3
                 self.stocks_df.loc[index, saq_name] = quant_rating
                 self.stocks_df.loc[index, saw_name] = 3
-                fundamental_score += 0.1 * 3
-                fundamental_score += 0.15 * quant_rating
-                fundamental_score += 0.1 * 3
+                fundamental_score += rank_to_god_score_weight * 3
+                fundamental_score += rank_to_god_score_weight * quant_rating
+                fundamental_score += rank_to_god_score_weight * 3
         elif sa_authors_flag == True and sa_quant_flag == True and sa_wall_flag == False: 
                 self.stocks_df.loc[index, saa_name] = 3
                 self.stocks_df.loc[index, saq_name] = 3
                 self.stocks_df.loc[index, saw_name] = sa_wall_street
-                fundamental_score += 0.1 * 3
-                fundamental_score += 0.15 * 3
-                fundamental_score += 0.1 * sa_wall_street
+                fundamental_score += rank_to_god_score_weight * 3
+                fundamental_score += rank_to_god_score_weight * 3
+                fundamental_score += rank_to_god_score_weight * sa_wall_street
         elif sa_authors_flag == True and sa_quant_flag == True and sa_wall_flag == True: 
                 self.stocks_df.loc[index, saa_name] = 3
                 self.stocks_df.loc[index, saq_name] = 3
                 self.stocks_df.loc[index, saw_name] = 3
-                fundamental_score += 0.1 * 3
-                fundamental_score += 0.15 * 3
-                fundamental_score += 0.1 * 3
+                fundamental_score += rank_to_god_score_weight * 3
+                fundamental_score += rank_to_god_score_weight * 3
+                fundamental_score += rank_to_god_score_weight * 3
 
     def read_file(self, file_path, stock_interval):
         try:
@@ -468,7 +563,7 @@ class ClientsScraper:
             else:
                 print("Problem with reading file")
                 return
-            if(stock_interval == "Sentiment Rank" or stock_interval == 'Valuations'):
+            if(stock_interval == "RankToGod Analysis" or stock_interval == 'Valuations'):
                 symbol_np = symbol_pd['symbol'].to_numpy()
                 symbol_arr = fixingArray(symbol_np)
                 self.stocks_df['Symbol'] = symbol_arr
@@ -523,3 +618,29 @@ def setBrowser(url):
     driver = webdriver.Chrome(ChromeDriverManager().install())
     driver.get(url)
     return driver
+
+
+def cal_avg(arr,years:int):
+    if(arr[-1] == 'At Loss'):
+        return 'At Loss'
+    arr = arr[:-1]
+    new_arr = []
+    for num in arr:
+        if num != 'At Loss' and num != 'N/A':
+            new_arr.append(float(num))
+    if(len(new_arr) < years):
+        years = len(new_arr)
+    return np.mean([float(num) for num in arr[-years:]])
+    
+def get_high_low(arr,years:int):
+    if(arr[-1] == 'At Loss'):
+        return 'At Loss','At Loss'
+    arr = arr[:-1]
+    new_arr = []
+    for num in arr:
+        if num != 'At Loss' and num != 'N/A':
+            new_arr.append(float(num))
+    if(len(new_arr) < years):
+        years = len(new_arr)
+    arr_float = [float(num) for num in arr[-years:]]
+    return np.max(arr_float), np.min(arr_float)

@@ -77,3 +77,7 @@ Changing scrapping tipRanks to seeking alpha alone.
 -deleted 'weekly' and 'monthly' options
 -added 'Valuations' option - take a lot of valuations per stock
 ---------------------------------
+-------------V2.2------------------
+-added valuation datas
+-added RankToGod Analaysis - mix of ChartToGod and original RankToGod
+---------------------------------
