@@ -621,26 +621,30 @@ def setBrowser(url):
 
 
 def cal_avg(arr,years:int):
-    if(arr[-1] == 'At Loss'):
+    if(all(value == 'At Loss' or value == 'N/A'  for value in arr)):
         return 'At Loss'
     arr = arr[:-1]
     new_arr = []
     for num in arr:
         if num != 'At Loss' and num != 'N/A':
             new_arr.append(float(num))
+        else:
+            new_arr.append(0)
     if(len(new_arr) < years):
         years = len(new_arr)
-    return np.mean([float(num) for num in arr[-years:]])
+    return np.mean([float(num) for num in new_arr[-years:]])
     
 def get_high_low(arr,years:int):
-    if(arr[-1] == 'At Loss'):
+    if(all(value == 'At Loss' or value == 'N/A' for value in arr)):
         return 'At Loss','At Loss'
     arr = arr[:-1]
     new_arr = []
     for num in arr:
         if num != 'At Loss' and num != 'N/A':
             new_arr.append(float(num))
+        else:
+            new_arr.append(0)
     if(len(new_arr) < years):
         years = len(new_arr)
-    arr_float = [float(num) for num in arr[-years:]]
+    arr_float = [float(num) for num in new_arr[-years:]]
     return np.max(arr_float), np.min(arr_float)
