@@ -25,6 +25,10 @@ def run_technical(symbol,index):
     final_score = seq_score_monthly = seq_score_weekly = rsi_score_monthly = rsi_score_weekly = ma_score_monthly = ma_score_weekly = tense_score_weekly = tense_score_monthly = 0
     today = date.today()
     try:
+        if(symbol == 'BRK.B'): symbol = 'BRK-B'
+        if(symbol == 'BRK.A'): symbol = 'BRK-A'
+        if(symbol == 'BF.B'): symbol = 'BF-B'
+        if(symbol == 'BF.A'): symbol = 'BF-A'
         data_monthly = pd.DataFrame(yf.download(tickers=symbol, period='5y',interval='1mo',progress=False)).dropna()
         data_weekly = pd.DataFrame(yf.download(tickers=symbol, period='5y',interval='1wk',progress=False)).dropna()
         seq_monthly = SequenceMethod(data_monthly,'monthly',today)

@@ -81,3 +81,12 @@ Changing scrapping tipRanks to seeking alpha alone.
 -added valuation datas
 -added RankToGod Analaysis - mix of ChartToGod and original RankToGod
 ---------------------------------
+
+-------------V2.3------------------
+- Fixed charttogod problem with stocks like br.a\br.k 
+---------------------------------
+
+-------------V2.31------------------
+- Deleting AI column
+- Update SA API
+---------------------------------

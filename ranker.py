@@ -29,7 +29,7 @@ rank_to_god_score_weight = 0.14285714
 final_score_weight = 0.1111
 fundamental_score = 0
 first_blocked = 0
-secret = False
+secret = True
 if(secret):
     saw_name = 'S1'
     saa_name = 'S2'
@@ -53,7 +53,7 @@ class Ranker:
         self.technical_score = 0
         if(stock_interval == 'RankToGod Analysis'):
             self.stocks_df = pd.DataFrame(columns=['Symbol',saw_name,saa_name,saq_name,zacks_name,p123_name,guru_name,'Technical Score',
-                            'RankToGod Score',tipranks_name,'AI','Final Score','Sector','Industry','Market Cap','P/E','Forward P/E','Beta','Earnings'])
+                            'RankToGod Score',tipranks_name,'Final Score','Sector','Industry','Market Cap','P/E','Forward P/E','Beta','Earnings'])
         elif(stock_interval == 'Valuations'):
             self.stocks_df = pd.DataFrame(columns=['Symbol','P/E','Forward P/E','Beta','WACC %(TTM)','Buyback Yield %(TTM)','Dividend %','Shs Outstand','Basic Eps TTM'
                             ,'Consensus EPS Estimates','Sector','Industry','Market Cap','Earnings','Purchase Of Property, Plant, Equipment TTM'
@@ -97,7 +97,7 @@ class Ranker:
         # self.portfolio123_technical_scrapper(symbol, index)
         self.guru_scrapper(symbol,index)
         self.stocks_df.loc[index, 'RankToGod Score'] =f"={fundamental_score}+0.14285714*(I{index+2}*5)"
-        self.stocks_df.loc[index, 'Final Score'] =f"=0.7777*J{index+2} + 0.1111*K{index+2} + 0.1111*L{index+2}"
+        self.stocks_df.loc[index, 'Final Score'] =f"=0.8*J{index+2} + 0.2*K{index+2}"
         api_key = os.getenv('guru_api_key')
         try:
             url = f"https://api.gurufocus.com/public/user/{api_key}/stock/{symbol}/financials"

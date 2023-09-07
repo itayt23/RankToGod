@@ -4,8 +4,6 @@ from window import Layout
 import PySimpleGUI as sg
 from pathlib import Path
 import pandas as pd
-import requests
-from bs4 import BeautifulSoup
 
 
 working_sentiment = False
